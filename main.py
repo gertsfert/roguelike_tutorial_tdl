@@ -21,10 +21,15 @@ FOV_ALGO = 'BASIC' # default fox algorithm
 FOV_LIGHT_WALLS = True
 TORCH_RADIUS = 10
 
-color_dark_wall = (0, 0, 100)
+WORLD_MAP = True
+
+color_dark_wall = (0, 0, 150)
 color_light_wall = (130, 110, 50)
 color_dark_ground = (50, 50, 150)
 color_light_ground = (200, 180, 50)
+
+if not WORLD_MAP:
+    color_dark_wall = color_dark_ground
 
 
 class GameObject:
