@@ -34,13 +34,21 @@ color_light_ground = (200, 180, 50)
 class GameObject:
     # this is a generic object: the player, a monster, an item, the stairs...
     # it's always represented by a character on screen.
-    def __init__(self, x, y, char, name, color, blocks=False):
+    def __init__(self, x, y, char, name, color, blocks=False, fighter=None, ai=None):
         self.name = name
         self.blocks = blocks
         self.x = x
         self.y = y
         self.char = char
         self.color = color
+
+        self.fighter = fighter
+        if self.fighter:  # let the fighter component know who owns it
+            self.fighter.owner = self
+
+        self.ai = ai
+        if self.ai:  # let the AI component know who owns it
+            self.ai.owner = self
 
     def move(self, dx, dy):
         # check if movement blocked
@@ -62,6 +70,21 @@ class GameObject:
         con.draw_char(self.x, self.y, ' ', self.color, bg=None)
 
 
+class Fighter:
+    # combat-related properties and methods (monster, player, NPC)
+    def __init__(self, hp, defense, power):
+        self.max_hp = hp
+        self.hp = hp
+        self.defense = defense
+        self.power = power
+
+
+class BasicMonster:
+    # AI for a basic monster
+    def take_turn(self):
+        print('The {} growls'.format(self.owner.name))
+
+
 class Rect:
     # a rectangle on the map, used to characterize a room
     def __init__(self, x, y, w, h):
@@ -73,7 +96,7 @@ class Rect:
     def center(self):
         center_x = (self.x1 + self.x2)//2
         center_y = (self.y1 + self.y2)//2
-        return (center_x, center_y)
+        return center_x, center_y
 
     def intersect(self, other):
         # returns true if this rectangle intersects with another one
@@ -201,11 +224,16 @@ def place_objects(room):
         if not is_blocked(x, y):
             if randint(0, 100) < 80: # 80% chance of getting an orc
                 # create an orc
+                fighter_component = Fighter(hp = 10, defense=0, power=3)
+                ai_component = BasicMonster()
                 monster = GameObject(x, y, 'o', 'orc', colors.desaturated_green,
-                                     blocks=True)
+                                     blocks=True, fighter=fighter_component, ai=ai_component)
             else:
+                # create a troll
+                fighter_component = Fighter(hp=16, defense=1, power=4)
+                ai_component = BasicMonster()
                 monster = GameObject(x, y, 'T', 'troll', colors.darker_green,
-                                     blocks=True)
+                                     blocks=True, fighter=fighter_component, ai=ai_component)
 
             objects.append(monster)
 
@@ -349,7 +377,10 @@ root = tdl.init(SCREEN_WIDTH, SCREEN_HEIGHT, title='Roguelike', fullscreen=False
 con = tdl.Console(SCREEN_WIDTH, SCREEN_HEIGHT)
 tdl.setFPS(LIMIT_FPS)
 
-player = GameObject(0, 0, '@', 'player', colors.white, blocks=True)
+# create object representing the player
+fighter_component = Fighter(hp=30, defense=2, power=5)
+player = GameObject(0, 0, '@', 'player', colors.white, blocks=True, fighter=fighter_component)
+
 objects = [player]
 
 fov_recompute = True
