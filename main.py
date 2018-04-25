@@ -16,9 +16,15 @@ ROOM_MAX_SIZE = 10
 ROOM_MIN_SIZE = 6
 MAX_ROOMS = 30
 
-color_dark_wall = (0, 0, 100)
-color_dark_ground = (50, 50, 150)
+# Lighting Properties
+FOV_ALGO = 'BASIC' # default fox algorithm
+FOV_LIGHT_WALLS = True
+TORCH_RADIUS = 10
 
+color_dark_wall = (0, 0, 100)
+color_light_wall = (130, 110, 50)
+color_dark_ground = (50, 50, 150)
+color_light_ground = (200, 180, 50)
 
 
 class GameObject:
@@ -38,8 +44,12 @@ class GameObject:
             self.y += dy
 
     def draw(self):
-        # draw the character that represents this object at its position
-        con.draw_char(self.x, self.y, self.char, self.color)
+        global visible_tiles
+
+        # check if visible
+        if (self.x, self.y) in visible_tiles:
+            # draw the character that represents this object at its position
+            con.draw_char(self.x, self.y, self.char, self.color)
 
     def clear(self):
         # erase the character that represents this object
@@ -124,7 +134,7 @@ def make_map():
 
         new_room = Rect(x, y, w, h)
 
-        # run through the other rooms and see if they ntersect with this one
+        # run through the other rooms and see if they intersect with this one
         failed = False
         for other_room in rooms:
             if new_room.intersect(other_room):
@@ -142,7 +152,7 @@ def make_map():
             (new_x, new_y) = new_room.center()
 
             if num_rooms == 0:
-                # this is the first room thwer ethe player starts
+                # this is the first room that the player starts
                 player.x = new_x
                 player.y = new_y
 
@@ -150,7 +160,7 @@ def make_map():
                 # all rooms after the first:
                 # connect it to the previous room with a tunnel
 
-                # center cooridnates of previous room
+                # center coordinates of previous room
                 (prev_x, prev_y) = rooms[num_rooms - 1].center()
 
                 # flip a coin
@@ -159,7 +169,7 @@ def make_map():
                     create_h_tunnel(prev_x, new_x, prev_y)
                     create_v_tunnel(prev_y, new_y, new_x)
                 else:
-                    # first mvoe certically then horizontally
+                    # first move vertically then horizontally
                     create_v_tunnel(prev_y, new_y, prev_x)
                     create_h_tunnel(prev_x, new_x, new_y)
 
@@ -167,10 +177,12 @@ def make_map():
             rooms.append(new_room)
             num_rooms += 1
 
-def handle_keys(realtime):
-    global playerx, playery
 
-    if realtime:
+def handle_keys():
+    global playerx, playery
+    global fov_recompute
+
+    if REALTIME:
         keypress = False
         for event in tdl.event.get():
             if event.type == 'KEYDOWN':
@@ -193,26 +205,67 @@ def handle_keys(realtime):
     # movement keys
     if user_input.key == 'UP':
         player.move(0, -1)
+        fov_recompute = True
     elif user_input.key == 'DOWN':
         player.move(0, 1)
+        fov_recompute = True
     elif user_input.key == 'LEFT':
         player.move(-1, 0)
+        fov_recompute = True
     elif user_input.key == 'RIGHT':
         player.move(1, 0)
+        fov_recompute = True
+
+
+def is_visible_tile(x, y):
+    global my_map
+
+    if x >= MAP_WIDTH or x < 0:
+        return False
+    elif y >= MAP_HEIGHT or y < 0:
+        return False
+    elif my_map[x][y].blocked:
+        return False
+    elif my_map[x][y].block_sight:
+        return False
+    else:
+        return True
 
 
 def render_all():
+    global fov_recompute
+    global visible_tiles
+
+    if fov_recompute:
+        # recompute FOV if needed (the player moved or something)
+        fov_recompute = False
+        visible_tiles = tdl.map.quickFOV(player.x, player.y,
+                                         is_visible_tile,
+                                         fov=FOV_ALGO,
+                                         radius=TORCH_RADIUS,
+                                         lightWalls=FOV_LIGHT_WALLS)
+
+        # set bg color according to the FOV
+        for y in range(MAP_HEIGHT):
+            for x in range(MAP_WIDTH):
+                visible = (x, y) in visible_tiles
+                wall = my_map[x][y].block_sight
+                if not visible:
+                    # out of player FOV
+                    if wall:
+                        con.draw_char(x, y, None, fg=None, bg=color_dark_wall)
+                    else:
+                        con.draw_char(x, y, None, fg=None, bg=color_dark_ground)
+                else:
+                    # visible
+                    if wall:
+                        con.draw_char(x, y, None, fg=None, bg=color_light_wall)
+                    else:
+                        con.draw_char(x, y, None, fg=None, bg=color_light_ground)
+
     # draw all objects in the list
     for obj in objects:
         obj.draw()
-
-    for y in range(MAP_HEIGHT):
-        for x in range(MAP_WIDTH):
-            wall = my_map[x][y].block_sight
-            if wall:
-                con.draw_char(x, y, None, fg=None, bg=color_dark_wall)
-            else:
-                con.draw_char(x, y, None, fg=None, bg=color_dark_ground)
 
     root.blit(con, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0)
 
@@ -230,6 +283,8 @@ player = GameObject(25, 23, '@', (255, 255, 255))
 npc = GameObject(SCREEN_WIDTH//2 - 5, SCREEN_HEIGHT//2, '@', (255, 255, 0))
 objects = [npc, player]
 
+fov_recompute = True
+
 make_map()
 
 # main loop
@@ -243,6 +298,6 @@ while not tdl.event.is_window_closed():
         obj.clear()
 
     # handle keys and exit game if needed
-    exit_game = handle_keys(REALTIME)
+    exit_game = handle_keys()
     if exit_game:
         break
