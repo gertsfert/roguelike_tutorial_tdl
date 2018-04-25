@@ -1,5 +1,7 @@
 import tdl
 from random import randint
+import colors
+
 # windows size in characters
 SCREEN_WIDTH = 80
 SCREEN_HEIGHT = 50
@@ -16,6 +18,8 @@ ROOM_MAX_SIZE = 10
 ROOM_MIN_SIZE = 6
 MAX_ROOMS = 30
 
+MAX_ROOM_MONSTERS = 3
+
 # Lighting Properties
 FOV_ALGO = 'BASIC' # default fox algorithm
 FOV_LIGHT_WALLS = True
@@ -30,7 +34,9 @@ color_light_ground = (200, 180, 50)
 class GameObject:
     # this is a generic object: the player, a monster, an item, the stairs...
     # it's always represented by a character on screen.
-    def __init__(self, x, y, char, color):
+    def __init__(self, x, y, char, name, color, blocks=False):
+        self.name = name
+        self.blocks = blocks
         self.x = x
         self.y = y
         self.char = char
@@ -38,7 +44,7 @@ class GameObject:
 
     def move(self, dx, dy):
         # check if movement blocked
-        if not my_map[self.x + dx][self.y + dy].blocked:
+        if not is_blocked(self.x + dx, self.y + dy):
             # move by the given amount
             self.x += dx
             self.y += dy
@@ -175,9 +181,46 @@ def make_map():
                     create_v_tunnel(prev_y, new_y, prev_x)
                     create_h_tunnel(prev_x, new_x, new_y)
 
+            # add objects to room
+            place_objects(new_room)
+
             # append new room to the list
             rooms.append(new_room)
             num_rooms += 1
+
+
+def place_objects(room):
+    # choose random number of monsters
+    num_monsters = randint(0, MAX_ROOM_MONSTERS)
+
+    for i in range(num_monsters):
+        x = randint(room.x1, room.x2)
+        y = randint(room.y1, room.y2)
+
+        # check if blocked
+        if not is_blocked(x, y):
+            if randint(0, 100) < 80: # 80% chance of getting an orc
+                # create an orc
+                monster = GameObject(x, y, 'o', 'orc', colors.desaturated_green,
+                                     blocks=True)
+            else:
+                monster = GameObject(x, y, 'T', 'troll', colors.darker_green,
+                                     blocks=True)
+
+            objects.append(monster)
+
+
+def is_blocked(x, y):
+    # first test the map tile
+    if my_map[x][y].blocked:
+        return True
+
+    # now check for any blocking objects
+    for obj in objects:
+        if obj.blocks and obj.x == x and obj.y == y:
+            return True
+
+    return False
 
 
 def handle_keys():
@@ -202,20 +245,42 @@ def handle_keys():
         tdl.set_fullscreen(not tdl.get_fullscreen())
 
     elif user_input.key == 'ESCAPE':
-        return True  # exit game
+        return 'exit'  # exit game
 
-    # movement keys
-    if user_input.key == 'UP':
-        player.move(0, -1)
-        fov_recompute = True
-    elif user_input.key == 'DOWN':
-        player.move(0, 1)
-        fov_recompute = True
-    elif user_input.key == 'LEFT':
-        player.move(-1, 0)
-        fov_recompute = True
-    elif user_input.key == 'RIGHT':
-        player.move(1, 0)
+    if game_state == 'playing':
+        # movement keys
+        if user_input.key == 'UP':
+            player_move_or_attack(0, -1)
+        elif user_input.key == 'DOWN':
+            player_move_or_attack(0, 1)
+        elif user_input.key == 'LEFT':
+            player_move_or_attack(-1, 0)
+        elif user_input.key == 'RIGHT':
+            player_move_or_attack(1, 0)
+        else:
+            return 'didnt-take-turn'
+
+
+def player_move_or_attack(dx, dy):
+    global fov_recompute
+
+    # the coordinates the player is moving to/attacking
+    x = player.x + dx
+    y = player.y + dy
+
+    # try to find an attackable object there
+    target = None
+    for obj in objects:
+            if obj.x == x and obj.y == y:
+                target = obj
+                break
+
+    # attack if target found, move otherwise
+    if target is not None:
+        print('The {} laughs at your puny efforts to attack her!'
+              .format(target.name))
+    else:
+        player.move(dx, dy)
         fov_recompute = True
 
 
@@ -284,13 +349,15 @@ root = tdl.init(SCREEN_WIDTH, SCREEN_HEIGHT, title='Roguelike', fullscreen=False
 con = tdl.Console(SCREEN_WIDTH, SCREEN_HEIGHT)
 tdl.setFPS(LIMIT_FPS)
 
-player = GameObject(25, 23, '@', (255, 255, 255))
-npc = GameObject(SCREEN_WIDTH//2 - 5, SCREEN_HEIGHT//2, '@', (255, 255, 0))
-objects = [npc, player]
+player = GameObject(0, 0, '@', 'player', colors.white, blocks=True)
+objects = [player]
 
 fov_recompute = True
 
 make_map()
+
+game_state = 'playing'
+player_action = None
 
 # main loop
 while not tdl.event.is_window_closed():
@@ -303,6 +370,12 @@ while not tdl.event.is_window_closed():
         obj.clear()
 
     # handle keys and exit game if needed
-    exit_game = handle_keys()
-    if exit_game:
+    player_action= handle_keys()
+    if player_action == 'exit':
         break
+
+    # let monsters take their turn
+    if game_state == 'playing' and player_action != 'didnt-take-turn':
+        for obj in objects:
+            if obj != player:
+                print('The {} growls'.format(obj.name))
