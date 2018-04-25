@@ -1,6 +1,7 @@
 import tdl
 from random import randint
 import colors
+import math
 
 # windows size in characters
 SCREEN_WIDTH = 80
@@ -69,6 +70,23 @@ class GameObject:
         # erase the character that represents this object
         con.draw_char(self.x, self.y, ' ', self.color, bg=None)
 
+    def move_towards(self, target_x, target_y):
+        # vector from this object to the target, and distance
+        dx = target_x - self.x
+        dy = target_y - self.y
+        distance = math.sqrt(dx **2 + dy ** 2)
+
+        # normalize it to length 1 (preserving direction), then round it
+        # and convert to integer so the movement is restricted to the map grid
+        dx = int(round(dx / distance))
+        dy = int(round(dy / distance))
+        self.move(dx, dy)
+
+    def distance_to(self, other):
+        # return the distance to another object
+        dx = other.x - self.x
+        dy = other.y - self.y
+        return math.sqrt(dx ** 2 + dy ** 2)
 
 class Fighter:
     # combat-related properties and methods (monster, player, NPC)
@@ -82,7 +100,16 @@ class Fighter:
 class BasicMonster:
     # AI for a basic monster
     def take_turn(self):
-        print('The {} growls'.format(self.owner.name))
+        # a basic monster takes its turn. if you can see it, it can see you
+        monster = self.owner
+        if (monster.x, monster.y) in visible_tiles:
+            # move towards player if far away
+            if monster.distance_to(player) >= 2:
+                monster.move_towards(player.x, player.y)
+
+            elif player.fighter.hp > 0:
+                print('The attack of the {} bounces off your shiny metal armour'
+                      .format(monster.name))
 
 
 class Rect:
@@ -408,5 +435,5 @@ while not tdl.event.is_window_closed():
     # let monsters take their turn
     if game_state == 'playing' and player_action != 'didnt-take-turn':
         for obj in objects:
-            if obj != player:
-                print('The {} growls'.format(obj.name))
+            if obj.ai:
+                obj.ai.take_turn()
