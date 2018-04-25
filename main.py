@@ -40,6 +40,15 @@ class GameObject:
         con.draw_char(self.x, self.y, ' ', self.color, bg=None)
 
 
+class Rect:
+    # a rectangle on the map, used to characterize a room
+    def __init__(self, x, y, w, h):
+        self.x1 = x
+        self.y1 = y
+        self.x2 = x + w
+        self.y2 = y + h
+
+
 class Tile:
     # a tile of the map and its properties
     def __init__(self, blocked, block_sight=None):
@@ -52,19 +61,46 @@ class Tile:
         self.block_sight = block_sight
 
 
+def create_room(room):
+    global my_map
+    # go through the tiles in the rectangle and make them passable
+    # leave one tile out in all directions (so that if two rooms are next to each-other
+    # but not overlapping, there will always be one wall separating them.
+    for x in range(room.x1 + 1, room.x2):
+        for y in range(room.y1 + 1, room.y2):
+            my_map[x][y].blocked = False
+            my_map[x][y].block_sight = False
+
+
+def create_h_tunnel(x1, x2, y):
+    global my_map
+    for x in range(min(x1, x2), max(x1, x2) + 1):
+        my_map[x][y].blocked = False
+        my_map[x][y].block_sight = False
+
+
+def create_v_tunnel(y1, y2, x):
+    global my_map
+    for y in range(min(y1, y2), max(y1, y2) + 1):
+        my_map[x][y].blocked = False
+        my_map[x][y].block_sight = False
+
+
 def make_map():
     global my_map
 
-    # fill map with "unblocked" tiles
-    # uses nested list comprehension
-    my_map = [[Tile(False)
-              for y in range(MAP_HEIGHT)]
-              for x in range(MAP_WIDTH)]
+    # fill map with "blocked" tiles
+    my_map = [[Tile(True)
+           for y in range(MAP_HEIGHT)]
+           for x in range(MAP_WIDTH)]
 
-    my_map[30][22].blocked = True
-    my_map[30][22].block_sight = True
-    my_map[50][22].blocked = True
-    my_map[50][22].block_sight = True
+    # create two rooms
+    room1 = Rect(20, 15, 10, 15)
+    room2 = Rect(50, 15, 10, 15)
+    create_room(room1)
+    create_room(room2)
+
+    create_h_tunnel(25, 55, 23)
 
 
 def handle_keys():
@@ -109,7 +145,7 @@ def render_all():
 
 tdl.setFPS(LIMIT_FPS)
 
-player = GameObject(SCREEN_WIDTH//2, SCREEN_HEIGHT//2, '@', (255, 255, 255))
+player = GameObject(25, 23, '@', (255, 255, 255))
 npc = GameObject(SCREEN_WIDTH//2 - 5, SCREEN_HEIGHT//2, '@', (255, 255, 0))
 objects = [npc, player]
 
