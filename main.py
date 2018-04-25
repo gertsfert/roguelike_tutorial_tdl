@@ -1,18 +1,18 @@
 import tdl
 
+# windows size in characters
 SCREEN_WIDTH = 80
 SCREEN_HEIGHT = 50
-LIMIT_FPS = 20
+
+# map size in characters
 MAP_WIDTH = 80
 MAP_HEIGHT = 45
 
+LIMIT_FPS = 20
 
-tdl.set_font('libtcod_fonts/arial10x10.png', greyscale=True, altLayout=True)
-
-root = tdl.init(SCREEN_WIDTH, SCREEN_HEIGHT, title='Roguelike', fullscreen=False)
-con = tdl.Console(SCREEN_WIDTH, SCREEN_HEIGHT)
 color_dark_wall = (0, 0, 100)
 color_dark_ground = (50, 50, 150)
+
 
 
 class GameObject:
@@ -102,11 +102,25 @@ def make_map():
 
     create_h_tunnel(25, 55, 23)
 
+    # place the player inside the first room
+    player.x = 25
+    player.y = 23
 
-def handle_keys():
+
+def handle_keys(realtime):
     global playerx, playery
 
-    user_input = tdl.event.key_wait()
+    if realtime:
+        keypress = False
+        for event in tdl.event.get():
+            if event.type == 'KEYDOWN':
+                user_input = event
+                keypress = True
+        if not keypress:
+            return
+
+    else: # turn-based
+        user_input = tdl.event.key_wait()
 
     # system keys
     if user_input.key == 'ENTER' and user_input.alt:
@@ -143,6 +157,13 @@ def render_all():
     root.blit(con, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0)
 
 
+# ------------------------------------------------------------------------- #
+# Initialization and main loop                                              #
+# ------------------------------------------------------------------------- #
+
+tdl.set_font('libtcod_fonts/arial10x10.png', greyscale=True, altLayout=True)
+root = tdl.init(SCREEN_WIDTH, SCREEN_HEIGHT, title='Roguelike', fullscreen=False)
+con = tdl.Console(SCREEN_WIDTH, SCREEN_HEIGHT)
 tdl.setFPS(LIMIT_FPS)
 
 player = GameObject(25, 23, '@', (255, 255, 255))
@@ -153,11 +174,11 @@ make_map()
 
 # main loop
 while not tdl.event.is_window_closed():
+    # draw all objects in list
     render_all()
+    tdl.flush()
 
-    tdl.flush() # draw frame
-
-    # clear objects
+    # clear objects before they are redrawn
     for obj in objects:
         obj.clear()
 
