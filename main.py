@@ -21,15 +21,10 @@ FOV_ALGO = 'BASIC' # default fox algorithm
 FOV_LIGHT_WALLS = True
 TORCH_RADIUS = 10
 
-WORLD_MAP = True
-
 color_dark_wall = (0, 0, 150)
 color_light_wall = (130, 110, 50)
 color_dark_ground = (50, 50, 150)
 color_light_ground = (200, 180, 50)
-
-if not WORLD_MAP:
-    color_dark_wall = color_dark_ground
 
 
 class GameObject:
@@ -90,6 +85,8 @@ class Tile:
             block_sight = blocked
 
         self.block_sight = block_sight
+
+        self.explored = False
 
 
 def create_room(room):
@@ -257,16 +254,19 @@ def render_all():
                 wall = my_map[x][y].block_sight
                 if not visible:
                     # out of player FOV
-                    if wall:
-                        con.draw_char(x, y, None, fg=None, bg=color_dark_wall)
-                    else:
-                        con.draw_char(x, y, None, fg=None, bg=color_dark_ground)
+                    # if it's not visible right now, the player can only see it if its explored
+                    if my_map[x][y].explored:
+                        if wall:
+                            con.draw_char(x, y, None, fg=None, bg=color_dark_wall)
+                        else:
+                            con.draw_char(x, y, None, fg=None, bg=color_dark_ground)
                 else:
                     # visible
                     if wall:
                         con.draw_char(x, y, None, fg=None, bg=color_light_wall)
                     else:
                         con.draw_char(x, y, None, fg=None, bg=color_light_ground)
+                    my_map[x][y].explored = True
 
     # draw all objects in the list
     for obj in objects:
